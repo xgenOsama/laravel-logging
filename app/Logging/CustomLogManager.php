@@ -4,14 +4,15 @@ namespace App\Logging;
 
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
-
+use File;
+use Carbon\Carbon;
 class CustomLogManager
 {
     private $currentHandler;
     private $logger;
     private $maxSize;
     private $baseFile;
-
+    private $logRetentionDays = 30; // Retention period for logs in days
     /**
      * Create a Monolog instance.
      *
@@ -21,7 +22,7 @@ class CustomLogManager
     public function __invoke(array $config)
     {
         $this->logger = new Logger('split_daily');
-        $this->maxSize = 1 * 1024 * 1024; // 1MB
+        $this->maxSize = 50 * 1024 * 1024; // 1MB
         
         $this->baseFile = storage_path('logs/laravel.log');
         $this->currentHandler = $this->createInitialHandler();
@@ -97,5 +98,25 @@ class CustomLogManager
             $i++;
         } while (file_exists($newFile));
         return $newFile; // Full path to the next log file
+    }
+
+
+        /**
+     * Delete log files older than 30 days.
+     */
+    private function deleteOldLogs()
+    {
+        $logDirectory = storage_path('logs');
+        $files = glob($logDirectory . '/*.log'); // Adjust the pattern to match your log files
+        
+        foreach ($files as $file) {
+            $fileCreationTime = Carbon::createFromTimestamp(filemtime($file)); // Get last modified time
+            $expiryDate = Carbon::now()->subDays($this->logRetentionDays); // 30 days ago
+
+            if ($fileCreationTime->isBefore($expiryDate)) {
+                // Delete the file if it's older than 30 days
+                File::delete($file);
+            }
+        }
     }
 }
